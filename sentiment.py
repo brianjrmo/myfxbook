@@ -16,20 +16,29 @@ def get_community_outlook(session: str, timeout_s: float = 30.0) -> List[Dict[st
     
 def get_data(timestamp_utc: str, args: argparse.Namespace) -> int:
     session_path = os.path.expanduser(args.session_file)
+    creds = get_creds(args.email, args.password)
     if os.path.exists(session_path):
         with open(session_path, "r") as f:
             session = f.read()
     else:  
-        creds = get_creds(args.email, args.password)
         session = login(creds, timeout_s=args.timeout_seconds)
         with open(session_path, "w") as f:
             f.write(session)
-    
-    sentiment_path = os.path.expanduser(args.sentiment_file)
-    community_outlook_list = get_community_outlook(session, timeout_s=args.timeout_seconds)
+
+    try:
+        community_outlook_list = get_community_outlook(session, timeout_s=args.timeout_seconds)
+    except Exception as e:
+        # any error, login again and try again
+        print(f"[{ utc_now_iso()}] Error getting community outlook: {e}, logging in again")
+        session = login(creds, timeout_s=args.timeout_seconds)
+        with open(session_path, "w") as f:
+            f.write(session)
+        community_outlook_list = get_community_outlook(session, timeout_s=args.timeout_seconds)
+
     community_outlook_df = pd.DataFrame(community_outlook_list)
     community_outlook_df["DateTime"] = timestamp_utc
     community_outlook_df = community_outlook_df[["DateTime"] + [c for c in community_outlook_df.columns if c != "DateTime"]]
+    sentiment_path = os.path.expanduser(args.sentiment_file)
     exists = os.path.exists(sentiment_path) and os.path.getsize(sentiment_path) > 0
     community_outlook_df.to_csv(
         sentiment_path,
@@ -60,7 +69,7 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     return p.parse_args(argv)
 
 def main() -> int:
-    timestamp_utc = utc_now_iso()
+    timestamp_utc = utc_now_iso(adjust_second_0=True)
     args = parse_args(sys.argv[1:])
     return get_data(timestamp_utc, args)
 

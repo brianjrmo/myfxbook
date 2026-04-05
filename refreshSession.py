@@ -17,8 +17,11 @@ class Credentials:
         self.email = email
         self.password = password
 
-def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y.%m.%d %H:%M:%S")
+def utc_now_iso(adjust_second_0: bool = False) -> str:
+    if adjust_second_0:
+        return datetime.now(timezone.utc).replace(second=0).strftime("%Y.%m.%d %H:%M:%S")
+    else:
+        return datetime.now(timezone.utc).strftime("%Y.%m.%d %H:%M:%S")
 
 def http_get_json(url: str, timeout_s: float = 30.0) -> Dict[str, Any]:
     payload = {}
