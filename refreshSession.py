@@ -4,7 +4,6 @@ import json
 import os
 import sys
 import requests
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 from urllib.parse import urlencode
@@ -13,10 +12,10 @@ API_BASE = "https://www.myfxbook.com/api"
 class MyfxbookError(RuntimeError):
     pass
 
-@dataclass(frozen=True)
 class Credentials:
-    email: str
-    password: str
+    def __init__(self, email: str, password: str) -> None:
+        self.email = email
+        self.password = password
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -34,7 +33,7 @@ def http_get_json(url: str, timeout_s: float = 30.0) -> Dict[str, Any]:
         raise MyfxbookError(f"Request failed: {e}")
 
 def build_url(method: str, params: Dict[str, Any]) -> str:
-    return f"{API_BASE}/{method}.json?{urlencode(params)}"
+    return f"{API_BASE}/{method}.json?{urlencode(params, safe='%')}"
 
 def login(creds: Credentials, timeout_s: float = 30.0) -> str:
     url = build_url("login", {"email": creds.email, "password": creds.password})
@@ -46,12 +45,14 @@ def login(creds: Credentials, timeout_s: float = 30.0) -> str:
 
 def logout(session: str, timeout_s: float = 30.0) -> None:
     url = build_url("logout", {"session": session})
-    http_get_json(url, timeout_s=timeout_s)
+    logout_data = http_get_json(url, timeout_s=timeout_s)
+    print(f"[{utc_now_iso()}] logout successfully")
+    print(f"[{utc_now_iso()}] logout session: {session}")
 
-def get_creds(args: argparse.Namespace) -> Credentials:
-    email = args.email
-    password = args.password
-    return Credentials(email=email, password=password)
+def get_creds(email: str, password: str) -> Credentials:
+    email = email
+    password = password
+    return Credentials(email, password)
 
 def refresh_session(args: argparse.Namespace) -> int:
     # logout if session file exists
@@ -62,11 +63,11 @@ def refresh_session(args: argparse.Namespace) -> int:
         logout(session, timeout_s=args.timeout_seconds)
         os.remove(session_path)
 
-    creds = get_creds(args)
+    creds = get_creds(args.email, args.password)
 
     session = login(creds, timeout_s=args.timeout_seconds)
     print(f"[{utc_now_iso()}] logged in successfully")
-    print(f"[{utc_now_iso()}] session: {session}")
+    print(f"[{utc_now_iso()}] logged in session: {session}")
     with open(session_path, "w") as f:
         f.write(session)
 

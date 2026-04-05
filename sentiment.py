@@ -6,7 +6,6 @@ import os
 import sys
 import time
 import requests
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
@@ -14,10 +13,11 @@ from urllib.parse import urlencode
 API_BASE = "https://www.myfxbook.com/api"
 class MyfxbookError(RuntimeError):
     pass
-@dataclass(frozen=True)
+
 class Credentials:
     email: str
     password: str
+    
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
@@ -182,7 +182,7 @@ def get_creds(args: argparse.Namespace) -> Credentials:
             "or pass --email/--password."
         )
     return Credentials(email=email, password=password)
-def run_loop(args: argparse.Namespace) -> int:
+def get_data(args: argparse.Namespace) -> int:
     creds = get_creds(args)
     symbol = (args.symbol or "EURUSD").strip()
     interval_s = int(args.interval_seconds)
@@ -246,16 +246,10 @@ def run_loop(args: argparse.Namespace) -> int:
             time.sleep(max(1, interval_s))
 def parse_args(argv: List[str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Fetch Myfxbook community outlook by country every N seconds and append to CSV.",
+        description="Fetch Myfxbook community outlook and append to CSV.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p.add_argument("--symbol", default="EURUSD", help="Symbol to fetch (e.g. EURUSD).")
-    p.add_argument("--interval-seconds", type=int, default=900, help="Polling interval in seconds (15m = 900).")
-    p.add_argument(
-        "--align-interval",
-        action="store_true",
-        help="Align polling to UTC wall-clock boundaries (reduces drift).",
-    )
     p.add_argument(
         "--csv-path",
         default="~/workspace/myfxbook/eurusd_sentiment.csv",
@@ -268,7 +262,7 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     return p.parse_args(argv)
 def main() -> int:
     args = parse_args(sys.argv[1:])
-    return run_loop(args)
+    return get_data(args)
 if __name__ == "__main__":
     raise SystemExit(main())
 

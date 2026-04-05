@@ -1,6 +1,5 @@
 certifi==2025.4.26
 charset-normalizer==2.0.12
-dataclasses==0.8
 idna==3.10
 pkg-resources==0.0.0
 requests==2.27.1
