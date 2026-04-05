@@ -18,7 +18,7 @@ class Credentials:
         self.password = password
 
 def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(timezone.utc).strftime("%Y.%m.%d %H:%M:%S")
 
 def http_get_json(url: str, timeout_s: float = 30.0) -> Dict[str, Any]:
     payload = {}
@@ -46,7 +46,7 @@ def login(creds: Credentials, timeout_s: float = 30.0) -> str:
 def logout(session: str, timeout_s: float = 30.0) -> None:
     url = build_url("logout", {"session": session})
     logout_data = http_get_json(url, timeout_s=timeout_s)
-    print(f"[{utc_now_iso()}] logout successfully")
+    print(f"[{utc_now_iso()}] logout successfully: {logout_data}")
     print(f"[{utc_now_iso()}] logout session: {session}")
 
 def get_creds(email: str, password: str) -> Credentials:
