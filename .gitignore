@@ -1,3 +1,5 @@
 *.csv
 session.txt
 venv/
+__pycache__/
+
