@@ -9,11 +9,25 @@ from refreshSession import login, get_creds, build_url, http_get_json, MyfxbookE
 def get_community_outlook(session: str, timeout_s: float = 30.0) -> List[Dict[str, Any]]:
     url = build_url("get-community-outlook", {"session": session})
     data = http_get_json(url, timeout_s=timeout_s)
-    community_outlook_list = data.get("symbols")
-    if not isinstance(community_outlook_list, list):
+    community_outlook_symbols_list = data.get("symbols")
+    community_outlook_general_list = data.get("general")
+    if not isinstance(community_outlook_symbols_list, list):
         raise MyfxbookError("Unexpected response: missing 'symbols' list")
-    return community_outlook_list
+    return community_outlook_symbols_list, community_outlook_general_list
     
+def write_sentiment_data(data_list, data_name: str, timestamp_utc: str, args: argparse.Namespace) -> None:
+    df = pd.DataFrame(data_list)
+    df["DateTime"] = timestamp_utc
+    df = df[["DateTime"] + [c for c in df.columns if c != "DateTime"]]
+    output_path = os.path.expanduser(args.sentiment_file + data_name + ".csv")
+    exists = os.path.exists(output_path) and os.path.getsize(output_path) > 0
+    df.to_csv(
+        output_path,
+        mode="a" if exists else "w",
+        header=not exists,
+        index=False,
+    )
+
 def get_data(timestamp_utc: str, args: argparse.Namespace) -> int:
     session_path = os.path.expanduser(args.session_file)
     creds = get_creds(args.email, args.password)
@@ -26,26 +40,17 @@ def get_data(timestamp_utc: str, args: argparse.Namespace) -> int:
             f.write(session)
 
     try:
-        community_outlook_list = get_community_outlook(session, timeout_s=args.timeout_seconds)
+        community_outlook_symbols_list, community_outlook_general_list = get_community_outlook(session, timeout_s=args.timeout_seconds)
     except Exception as e:
         # any error, login again and try again
         print(f"[{ utc_now_iso()}] Error getting community outlook: {e}, logging in again")
         session = login(creds, timeout_s=args.timeout_seconds)
         with open(session_path, "w") as f:
             f.write(session)
-        community_outlook_list = get_community_outlook(session, timeout_s=args.timeout_seconds)
+        community_outlook_symbols_list, community_outlook_general_list = get_community_outlook(session, timeout_s=args.timeout_seconds)
 
-    community_outlook_df = pd.DataFrame(community_outlook_list)
-    community_outlook_df["DateTime"] = timestamp_utc
-    community_outlook_df = community_outlook_df[["DateTime"] + [c for c in community_outlook_df.columns if c != "DateTime"]]
-    sentiment_path = os.path.expanduser(args.sentiment_file)
-    exists = os.path.exists(sentiment_path) and os.path.getsize(sentiment_path) > 0
-    community_outlook_df.to_csv(
-        sentiment_path,
-        mode="a" if exists else "w",
-        header=not exists,
-        index=False,
-    )
+    write_sentiment_data(community_outlook_symbols_list, "symbols", timestamp_utc, args)
+    write_sentiment_data([community_outlook_general_list], "general", timestamp_utc, args)
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(
@@ -59,7 +64,7 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     )
     p.add_argument(
         "--sentiment_file",
-        default="~/workspace/myfxbook/sentiment.csv",
+        default="~/workspace/myfxbook/sentiment_",
         help="Sentiment CSV file path.",
     )
     p.add_argument("--timeout-seconds", type=float, default=30.0, help="HTTP request timeout.")
